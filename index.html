@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BA211Z Balance the Books</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  /* Layout: a green columnar ledger pad. General Journal on the left, Trial Balance on the right, red margin rule down the pad. */
+  :root{
+    --desk:#dfe6d6; --pad:#f3f7ec; --rule:#c7d8bd; --margin:#d07a6a; --ink:#1f2d3a; --ink-soft:#56636e;
+    --teal:#1e5a5a; --teal-hi:#2a7272; --green:#2b6447; --green-bg:#e1efe4; --red:#b03a2e; --red-bg:#f7e2de; --white:#ffffff;
+    --f-display:"Zilla Slab",Rockwell,"Roboto Slab",Georgia,serif;
+    --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    --f-num:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--desk);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+  .wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  [hidden]{display:none!important}
+  button{font-family:inherit}
+  :focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+
+  header{background:var(--teal);color:var(--white)}
+  header .wrap{padding-block:18px}
+  .eyebrow{font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;opacity:.85}
+  h1{font-family:var(--f-display);font-weight:700;font-size:clamp(1.8rem,5vw,2.6rem);margin:2px 0 0;line-height:1.1;text-wrap:balance}
+  main .wrap{padding-block:24px 56px}
+
+  .pad{background:var(--pad);border-radius:6px;box-shadow:0 2px 0 #c9d3bf,0 8px 24px rgba(31,45,58,.08);position:relative;
+    background-image:linear-gradient(90deg,transparent 0 30px,var(--margin) 30px 31px,transparent 31px);padding:22px 22px 22px 48px}
+  .pad h2{font-family:var(--f-display);font-weight:700;color:var(--teal);margin:0 0 10px;font-size:1.5rem;text-wrap:balance}
+  .pad p,.rules{max-width:68ch}
+  .rules{padding-left:20px} .rules li{margin:6px 0}
+  label{display:block;font-weight:600;margin:16px 0 6px}
+  input[type=text]{width:100%;max-width:360px;padding:10px 12px;font-size:1rem;border:1px solid #9fb39a;border-radius:4px;background:var(--white);color:var(--ink)}
+  .btn{display:inline-block;border:0;border-radius:4px;padding:11px 20px;font-size:1rem;font-weight:600;cursor:pointer;background:var(--teal);color:var(--white)}
+  .btn:hover{background:var(--teal-hi)}
+  .btn.warn{background:var(--red)}
+  .btn.small{padding:7px 14px;font-size:.92rem}
+
+  .game{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+  .status{margin:0 0 14px;color:var(--ink-soft);min-height:1.5em}
+  .colhead{font-family:var(--f-display);font-weight:700;color:var(--teal);font-size:1.3rem;margin:0 0 8px}
+
+  /* Journal */
+  .journal{display:grid;gap:12px}
+  .entry{background:var(--pad);border-radius:6px;padding:14px 16px 14px 48px;position:relative;box-shadow:0 1px 0 #c9d3bf;
+    background-image:linear-gradient(90deg,transparent 0 30px,var(--margin) 30px 31px,transparent 31px)}
+  .entry .top{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;justify-content:space-between}
+  .entry .date{position:absolute;left:4px;top:14px;width:24px;font-family:var(--f-num);font-size:.72rem;color:var(--ink-soft);text-align:center;line-height:1.1}
+  .entry .desc{font-weight:600}
+  .chip{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--teal);border:1px solid currentColor;border-radius:999px;padding:1px 8px;white-space:nowrap}
+  .jl{width:100%;border-collapse:collapse;margin:8px 0 10px;font-size:.95rem}
+  .jl td{padding:4px 6px;border-bottom:1px solid var(--rule)}
+  .jl td.amt{font-family:var(--f-num);text-align:right;width:7.5em;font-variant-numeric:tabular-nums}
+  .jl .cr td:first-child{padding-left:2.2em}
+  .jl .blank{color:#9aa79a}
+  .jl .miss{color:var(--red);font-weight:600}
+  .entry .foot{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+  .tag{font-size:.88rem;font-weight:600}
+  .tag.ok{color:var(--green)} .tag.bad{color:var(--red)}
+  .entry.posted{box-shadow:inset 4px 0 0 var(--green),0 1px 0 #c9d3bf}
+  .entry.open{box-shadow:inset 4px 0 0 var(--red),0 1px 0 #c9d3bf}
+  .entry.failed{box-shadow:inset 4px 0 0 var(--red),0 1px 0 #c9d3bf;opacity:.85}
+
+  /* Trial balance */
+  .tb{position:sticky;top:max(12px,env(safe-area-inset-top,0px))}
+  .tbl-wrap{overflow-x:auto}
+  .tbl{width:100%;border-collapse:collapse;font-size:.92rem;background:var(--pad)}
+  .tbl caption{text-align:left;font-size:.82rem;color:var(--ink-soft);padding:0 0 6px}
+  .tbl th{font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);text-align:right;padding:6px 8px;border-bottom:2px solid var(--ink)}
+  .tbl th:first-child{text-align:left}
+  .tbl td{padding:5px 8px;border-bottom:1px solid var(--rule)}
+  .tbl td.n{font-family:var(--f-num);text-align:right;font-variant-numeric:tabular-nums;width:6.8em}
+  .tbl tr.tot td{font-weight:600;border-top:1px solid var(--ink);border-bottom:4px double var(--ink)}
+  .diff{margin-top:10px;padding:10px 12px;border-radius:4px;font-weight:600}
+  .diff.ok{background:var(--green-bg);color:var(--green)}
+  .diff.bad{background:var(--red-bg);color:var(--red)}
+  .diff .n{font-family:var(--f-num)}
+
+  /* Question card */
+  .overlay{position:fixed;inset:0;background:rgba(20,32,32,.7);display:flex;align-items:center;justify-content:center;z-index:20;
+    padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+  .card{width:100%;max-width:680px;max-height:92vh;overflow:auto;border-radius:6px;padding:22px 24px 22px 52px;background:var(--pad);
+    background-image:linear-gradient(90deg,transparent 0 32px,var(--margin) 32px 33px,transparent 33px);box-shadow:0 18px 50px rgba(0,0,0,.35)}
+  .card .meta{font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);font-weight:600}
+  .card h3{font-size:clamp(1.1rem,3vw,1.3rem);line-height:1.35;margin:10px 0 16px;text-wrap:balance}
+  .opts{display:grid;gap:10px}
+  .opt{text-align:left;padding:11px 14px;border-radius:4px;border:1.5px solid #9fb39a;background:var(--white);color:var(--ink);font-size:1rem;cursor:pointer;line-height:1.35}
+  .opt:hover:not(:disabled){border-color:var(--teal)}
+  .opt:disabled{cursor:default}
+  .opt.correct{background:var(--green-bg);border-color:var(--green)}
+  .opt.incorrect{background:var(--red-bg);border-color:var(--red)}
+  .fb{margin-top:14px;padding:12px 14px;border-radius:4px;background:var(--white);border-left:4px solid var(--teal)}
+  .fb.ok{border-color:var(--green)} .fb.bad{border-color:var(--red)}
+  .fb strong{display:block;margin-bottom:2px}
+  .fb.ok strong{color:var(--green)} .fb.bad strong{color:var(--red)}
+  .card .actions{text-align:right;margin-top:14px}
+
+  /* Results */
+  .stamp{display:inline-block;font-family:var(--f-display);font-weight:700;font-size:1.6rem;letter-spacing:.06em;padding:4px 16px;border:4px solid currentColor;border-radius:6px;transform:rotate(-4deg);margin:6px 0 10px}
+  .stamp.ok{color:var(--green)} .stamp.bad{color:var(--red)}
+  .cert{background:var(--white);border:6px double var(--teal);border-radius:4px;padding:20px;margin:16px 0;text-align:center;max-width:560px}
+  .cert .name{font-family:var(--f-display);font-size:1.6rem;font-weight:700;margin:6px 0}
+  .cert .code{font-family:var(--f-num);font-size:1.4rem;font-weight:600;letter-spacing:.08em;color:var(--teal)}
+  .cert small{color:var(--ink-soft)}
+  .review{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:8px;max-width:820px}
+  .review li{background:var(--white);border-left:4px solid var(--green);padding:9px 14px;border-radius:0 4px 4px 0}
+  .review li.miss{border-color:var(--red)}
+  .review .q{font-weight:600} .review .a{color:var(--ink-soft);font-size:.93rem}
+
+  @media (max-width:860px){ .game{grid-template-columns:1fr} .tb{position:static} }
+  @media (max-width:480px){ .pad{padding:18px 16px 18px 42px} .entry{padding-left:42px;padding-right:12px} .card{padding:20px 18px 20px 44px}
+    .jl{font-size:.88rem} .jl td.amt{width:4.6em;padding:4px 2px} .jl .cr td:first-child{padding-left:1.2em} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow">BA211Z Principles of Financial Accounting · Winter 2027</div>
+    <h1>Balance the Books</h1>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <section id="intro" class="pad">
+      <h2>Five transactions are waiting to be posted.</h2>
+      <p>Each journal entry is locked behind one question about the BA211Z syllabus. Post all five, and make sure your trial balance balances.</p>
+      <ul class="rules">
+        <li>A <strong>correct answer</strong> posts both sides of the entry, the debit and the credit.</li>
+        <li>A <strong>wrong answer</strong> posts only the debit, so your trial balance goes <strong>out of balance</strong>.</li>
+        <li>You get <strong>one correcting entry</strong> for each mistake: answer a new question to post the missing credit. If you miss the correcting entry too, that entry stays unbalanced.</li>
+        <li>Finish with total debits equal to total credits to close the books and earn your completion code.</li>
+        <li>Play as many times as you like. Each round draws new questions and new amounts.</li>
+      </ul>
+      <label for="studentName">Your name (shown on your completion certificate)</label>
+      <input type="text" id="studentName" autocomplete="name" placeholder="First and last name">
+      <p style="margin-top:18px"><button class="btn" id="startBtn">Open the journal</button></p>
+    </section>
+
+    <section id="game" hidden>
+      <p class="status" id="status" aria-live="polite"></p>
+      <div class="game">
+        <div>
+          <h2 class="colhead">General Journal</h2>
+          <div class="journal" id="journal"></div>
+        </div>
+        <aside class="tb" aria-label="Trial balance">
+          <h2 class="colhead">Trial Balance</h2>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <caption>You, Inc. · January 8, 2027</caption>
+              <thead><tr><th scope="col">Account</th><th scope="col">Debit</th><th scope="col">Credit</th></tr></thead>
+              <tbody id="tbBody"></tbody>
+            </table>
+          </div>
+          <div class="diff" id="diff" aria-live="polite"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="results" class="pad" hidden aria-live="polite"></section>
+  </div>
+</main>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="qText">
+    <div class="meta" id="qMeta"></div>
+    <h3 id="qText"></h3>
+    <div class="opts" id="qOpts"></div>
+    <div class="fb" id="qFb" hidden aria-live="assertive"></div>
+    <div class="actions" id="qActions" hidden><button class="btn" id="continueBtn">Back to the journal</button></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   INSTRUCTOR SETTINGS: edit these to fit your course
+   ========================================================= */
+const CONFIG = {
+  completionCode: "DEBITS-EQUAL-CREDITS", // change each term so codes don't carry over
+  correctionsAllowed: 1                   // correcting entries allowed per transaction (0 = no second chances)
+};
+
+/* One journal entry per category. Each round assigns new random amounts. */
+const ENTRIES = [
+  { cat:"I", name:"Meet Your Instructor",    date:"Jan 4", desc:"Issued common stock for cash",               dr:"Cash",                  cr:"Common Stock" },
+  { cat:"T", name:"Tools & Materials",       date:"Jan 5", desc:"Purchased merchandise inventory on account", dr:"Merchandise Inventory", cr:"Accounts Payable" },
+  { cat:"P", name:"Points & Grades",         date:"Jan 6", desc:"Provided services on account",               dr:"Accounts Receivable",   cr:"Fees Earned" },
+  { cat:"D", name:"Deadlines & Late Work",   date:"Jan 7", desc:"Purchased equipment by issuing bonds",        dr:"Equipment",             cr:"Bonds Payable" },
+  { cat:"C", name:"Conduct & Communication", date:"Jan 8", desc:"Declared a cash dividend",                    dr:"Cash Dividends",        cr:"Cash Dividends Payable" }
+];
+const TB_ORDER = ["Cash","Accounts Receivable","Merchandise Inventory","Equipment","Accounts Payable","Cash Dividends Payable",
+                  "Bonds Payable","Common Stock","Cash Dividends","Fees Earned"];
+
+/* QUESTION BANK
+   cat = which journal entry it unlocks, a = correct answer, wrong = three distractors, why = shown after answering */
+const QUESTIONS = [
+  {"id": "I1", "cat": "I", "q": "It's 6 pm Friday and you're stuck on homework due Sunday. What's your smartest move?", "a": "Post it in Virtual Study Hall, since weekend email replies are for emergencies", "wrong": ["Email your instructor and wait, since she replies within 24 hours every day", "Email Online Learning, since they answer homework questions on weekends", "Skip it for now, since a placeholder score will cover the missing work"], "why": "Weekday replies come within 24 hours. On weekends, she replies to emergencies only, but classmates in Virtual Study Hall can often help sooner."},
+  {"id": "I2", "cat": "I", "q": "Which of these questions belongs in Virtual Study Hall instead of a private email to your instructor?", "a": "How to record bad debt expense on a Chapter 8 problem", "wrong": ["Why surgery will make you miss the Week 7 hard deadline", "Why your Final Exam score seems lower than expected", "A request for an office hours appointment"], "why": "Homework questions help the whole class, so post them where everyone can see them. Personal matters go to your instructor by email."},
+  {"id": "I3", "cat": "I", "q": "Your Canvas login stops working the night before a deadline. Who should you contact first?", "a": "Online Learning (phone or email)", "wrong": ["Cengage technical support (phone or chat)", "Your instructor, by office voicemail", "Classmates in the Virtual Study Hall forum"], "why": "Canvas problems go to Online Learning at (503) 491-7170 or onlinelearning@mhcc.edu."},
+  {"id": "I4", "cat": "I", "q": "Class meets in person in AC1309. Where are your instructor's office hours held?", "a": "In her office AC2663, or on Zoom", "wrong": ["In AC1309, right after each class", "In person only, by appointment", "By phone, at her office number"], "why": "Monday/Wednesday hours are 12:00–1:00, and Tuesday/Thursday hours are 10:00–12:00. The Zoom link is in the Modules."},
+  {"id": "I5", "cat": "I", "q": "Which statement about contacting your instructor is true?", "a": "Email and voicemail both work, with weekday replies in 24 hours", "wrong": ["Texting her cell phone is the fastest way to reach her on weekends", "She checks voicemail only during scheduled office hours", "She replies to every message within 24 hours, seven days a week"], "why": "On weekends, she replies to emergencies only."},
+  {"id": "I7", "cat": "I", "q": "Which skill is NOT a BA211Z learning outcome?", "a": "Computing a break-even point for a product", "wrong": ["Explaining how balance sheet items fit the accounting equation", "Describing the purpose and principles of internal controls", "Analyzing the cash flow statement to help stakeholders"], "why": "Break-even analysis is a BA213Z (managerial accounting) topic."},
+  {"id": "I8", "cat": "I", "q": "Which statement about BA211Z prerequisites is correct?", "a": "BA111 first; BA101Z and BA131 can be taken alongside", "wrong": ["BA111, BA101Z, and BA131 must all be finished before you start", "BA211Z has no prerequisites, only recommended courses", "BA213Z must be finished before you take BA211Z"], "why": "BA111 is the prerequisite, and BA101Z and BA131 are co-requisites."},
+  {"id": "T1", "cat": "T", "q": "You bought Cengage Unlimited for BA111. How long does it need to last for BA211Z?", "a": "Until the end of Winter Term", "wrong": ["Until the Week 10 hard deadline", "Until the end of Week 1, when you join", "Until the Week 7 hard deadline"], "why": "If your subscription doesn't expire until after March 23, you're good to go."},
+  {"id": "T2", "cat": "T", "q": "Your subscription runs out in February, and you plan to take BA213Z within a year. Which is the best value?", "a": "A 1-year Cengage Unlimited subscription", "wrong": ["A 4-month subscription now and another later", "A 2-year subscription from the MHCC Bookstore", "The $9.99 printed rental on its own"], "why": "One 1-year subscription covers both courses. Buying directly from Cengage costs about 25% less than the Bookstore."},
+  {"id": "T3", "cat": "T", "q": "Your financial aid won't arrive until after Week 1. How can you join Cengage by Friday of Week 1?", "a": "Use free temporary access, then buy before 10 days pass", "wrong": ["Wait for your aid, since aid delays waive the requirement", "Use temporary access, since it lasts the whole term", "Ask your instructor for an extension until Week 3"], "why": "Temporary access lasts 10 days, so plan to buy before it expires."},
+  {"id": "T4", "cat": "T", "q": "What does a Cengage Unlimited subscription include?", "a": "The eBook, your coursework, and the rest of the Cengage library", "wrong": ["Your coursework only, since the eBook costs extra", "The eBook only, since coursework is sold separately", "A printed textbook shipped to you for free"], "why": "The printed rental is an optional $9.99 add-on."},
+  {"id": "T5", "cat": "T", "q": "The syllabus says, \"We will be using Excel in this course!\" How do you get Excel?", "a": "Free through Microsoft 365, for all MHCC students", "wrong": ["Buy it from the MHCC Bookstore", "It comes with your Cengage Unlimited subscription", "You don't need it, since Google Sheets is required"], "why": "See the Tools and Technology section for the link."},
+  {"id": "T6", "cat": "T", "q": "You want practice before the Final that won't affect your grade. Which option fits?", "a": "Cengage Study Tools, like the Adaptive Study Plan and the study guide", "wrong": ["Answer keys for the graded homework, found in Study Tools", "Extra credit problems your instructor posts in Canvas", "Draft answers posted in an Ethics Discussion forum"], "why": "Study Tools also include crossword puzzles and other games. Your instructor generally doesn't offer extra credit."},
+  {"id": "T7", "cat": "T", "q": "Where are the Excel workbooks that go with your instructor's YouTube videos?", "a": "In the Weekly Module overviews", "wrong": ["Inside Cengage, under Study Tools", "Only in the YouTube video descriptions", "In an email you get each Monday"], "why": "Look for \"Amber's Videos\" in the On Canvas study tools."},
+  {"id": "T8", "cat": "T", "q": "Where do the Ethics Discussions take place?", "a": "In class and on Canvas", "wrong": ["In Cengage, with the homework", "By email to your instructor", "In the Virtual Study Hall forum"], "why": "Homework and the Accounting Cycle Recap are in Cengage. Ethics happens in class and on Canvas."},
+  {"id": "P1", "cat": "P", "q": "Which part of the course makes up just over half of your grade?", "a": "Chapter Homework (210 points)", "wrong": ["The Final Exam (75 points)", "Data Analytics (40 points)", "The Accounting Cycle Recap (45 points)"], "why": "Seven chapters × 30 points = 210 of 400 points, about 53%."},
+  {"id": "P2", "cat": "P", "q": "What's the most points you can lose over the whole term and still earn an A?", "a": "40 points", "wrong": ["36 points", "45 points", "60 points"], "why": "An A starts at 360 points, and 400 − 360 = 40."},
+  {"id": "P3", "cat": "P", "q": "Maria earns every possible point except that she skips all the Data Analytics Skill Builders and one Ethics Discussion. What's her final grade?", "a": "B (350 points)", "wrong": ["A (still above 90%)", "C (320 points)", "B, but only if she aces the Final"], "why": "400 − 40 − 10 = 350 points, which is in the B range (320–359)."},
+  {"id": "P4", "cat": "P", "q": "Jordan misses one Chapter Homework assignment (30 points) and one Ethics Discussion (10 points), and earns everything else. What's his grade?", "a": "A, with exactly 360 points", "wrong": ["B, with 359 points", "B, with 350 points", "A, with 370 points to spare"], "why": "400 − 30 − 10 = 360, which is exactly the A cutoff. One more missed point would drop him to a B."},
+  {"id": "P6", "cat": "P", "q": "What is the Accounting Cycle Recap?", "a": "A graded review of BA111 (45 points)", "wrong": ["An ungraded warm-up you can skip", "The first part of the Final Exam", "A BA111 grade that transfers to BA211Z"], "why": "It's in Cengage, due in Week 1, and worth about 11% of your grade."},
+  {"id": "P7", "cat": "P", "q": "Which missing assignment gets a 10% placeholder score after its suggested deadline?", "a": "A Chapter Homework assignment", "wrong": ["An Ethics Discussion post", "Both homework and discussions", "Neither, since missing work is recorded as zero"], "why": "Placeholders apply to every assignment except discussions, and your real score replaces them once you submit."},
+  {"id": "P8", "cat": "P", "q": "It's Week 9 and your grade is lower than you want. Which plan fits the syllabus?", "a": "Finish open work and use unlimited attempts on homework before Week 10 ends", "wrong": ["Ask for extra credit, which she offers when a grade is borderline", "Redo work from Week 3, which reopens for retakes in Week 9", "Post the Ethics Discussions you missed for half credit"], "why": "Extra credit generally isn't offered, work from earlier hard deadlines has closed, and discussions aren't accepted late."},
+  {"id": "D1", "cat": "D", "q": "Which of these is NOT on the Friday-of-Week-1 checklist?", "a": "Finish the Chapter 6 Homework", "wrong": ["Post your introduction to Getting to Know You", "Play the BA211Z Syllabus Quiz Game", "Join our class on Cengage"], "why": "The Week 1 checklist is: log in to Canvas, post your introduction, complete the survey, play this game, and join Cengage. Chapter 6 Homework isn't due until Sunday of Week 2."},
+  {"id": "D2", "cat": "D", "q": "It's Wednesday of Week 7, and you haven't done the Chapter 9 Homework that was due in Week 5. When does it become unavailable?", "a": "This Sunday, at the end of Week 7", "wrong": ["It already has, since work closes on its due date", "At the end of Week 10", "Never, since attempts are unlimited"], "why": "Work stays open until the next hard deadline at the end of Week 3, 7, or 10. Contact your instructor before Sunday."},
+  {"id": "D3", "cat": "D", "q": "The Chapter 11 Ethics Discussion is due Sunday, February 7, and you'll be traveling that weekend. What's your best move?", "a": "Post it before you leave, since discussions can't be late", "wrong": ["Post it by the Week 7 hard deadline instead", "Skip it, since a 10% placeholder will hold your spot", "Post it the following Sunday for half credit"], "why": "Discussions have no late window and no placeholder."},
+  {"id": "D4", "cat": "D", "q": "By the end of Week 4, Sam has finished only the Accounting Cycle Recap and the Chapter 6 Homework. Could Sam be dropped?", "a": "Yes, because most of the work due by Week 3 isn't done", "wrong": ["No, because the check only looks at Week 1 work", "No, because Sam has until the Week 7 hard deadline", "Only if Sam also misses the Final Exam"], "why": "The Week 4 Engagement Check defines \"little progress\" as not completing most activities due by the end of Week 3."},
+  {"id": "D5", "cat": "D", "q": "Which statement about the hard deadlines is correct?", "a": "At the ends of Weeks 3, 7, and 10, unfinished work closes", "wrong": ["Each assignment closes as soon as its own due date passes", "The hard deadlines apply only to the Final Exam", "At the ends of Weeks 4, 8, and 11, unfinished work closes"], "why": "Following the Course Summary keeps you well ahead of them."},
+  {"id": "D6", "cat": "D", "q": "How should you prepare for the Final Exam?", "a": "Review BA111 and every BA211Z chapter", "wrong": ["Review only the last three BA211Z chapters", "Review only the BA211Z chapters, not BA111", "Review only the Accounting Cycle Recap material"], "why": "The Final covers all concepts from BA111 and BA211Z."},
+  {"id": "D8", "cat": "D", "q": "Your Chapter 12 Homework (due Week 8) is still missing in Week 9. What's true?", "a": "It shows a 10% placeholder until you finish it in Week 10", "wrong": ["You've permanently lost every point for that assignment", "It shows a zero in the gradebook until the term ends", "The placeholder counts as 10% extra credit on your grade"], "why": "Your real score replaces the placeholder when you submit, as long as you finish before the Week 10 hard deadline."},
+  {"id": "C1", "cat": "C", "q": "Which use of AI crosses the line in this course?", "a": "Having AI write your Ethics post, then editing it lightly", "wrong": ["Asking AI to explain bonds, then checking it against the textbook", "Having AI proofread your post, and noting that in one sentence", "Using AI to quiz yourself on ratios before the Final"], "why": "Using AI as a substitute for your own original work isn't acceptable, even if you edit what it gives you."},
+  {"id": "C2", "cat": "C", "q": "You used Gemini to check the grammar in your discussion post. What should your acknowledgment look like?", "a": "One sentence saying you used Gemini to proofread", "wrong": ["Nothing, since proofreading doesn't count as AI use", "A copy of the full chat transcript", "An APA citation in a reference list"], "why": "A simple one-sentence description is all you need."},
+  {"id": "C3", "cat": "C", "q": "AI gave you a depreciation formula, and you used it in your homework without checking it. Which AI rule did you break?", "a": "AI contributions must be true (checked for accuracy)", "wrong": ["AI contributions must be attributed (credited to AI)", "AI may be used only for proofreading your work", "You may use only the AI tools that MHCC provides"], "why": "You're responsible for checking that what AI tells you is accurate."},
+  {"id": "C4", "cat": "C", "q": "The AI section says spelling and grammar matter less than your thinking, but the Communication Guidelines ask for error-free writing. How do these fit together?", "a": "Thinking matters most, but write professionally everywhere", "wrong": ["Spelling and grammar don't count in discussion posts", "Only emails to your instructor need to be error-free", "Use AI to rewrite everything so it has no errors"], "why": "Write as if you're communicating with your boss: clearly, legibly, and in your own voice."},
+  {"id": "C5", "cat": "C", "q": "You're emailing your instructor about a grade. Which approach fits the Communication Guidelines?", "a": "Write it as you would to your boss: clear and error-free", "wrong": ["Keep it casual, since email is an informal channel", "Write it in all caps so she knows it's urgent", "Skip the greeting and get straight to your point"], "why": "The course is a chance to practice workplace communication."},
+  {"id": "C6", "cat": "C", "q": "You strongly disagree with a classmate's Ethics post. What fits the course guidelines?", "a": "Reply respectfully and explain your reasoning", "wrong": ["Reply bluntly, since ethics questions have one right answer", "Report the post so it gets deleted", "Ignore it and post your view in Virtual Study Hall"], "why": "Use respect and courtesy. Only offensive or inflammatory posts are deleted."},
+  {"id": "C7", "cat": "C", "q": "Which of these is one of YOUR responsibilities under Our Responsibilities?", "a": "Telling your instructor about problems before a deadline", "wrong": ["Replying to every classmate's post within 24 hours", "Attending at least one office hour every week", "Finishing all of the coursework during Week 1"], "why": "You're also expected to work on time, manage your time proactively, and follow the Student Code of Conduct."},
+  {"id": "C8", "cat": "C", "q": "The syllabus or schedule changes in the middle of the term. How will you find out?", "a": "Course announcements and email, so check both", "wrong": ["Your instructor mails you a printed copy", "Changes are only announced at the hard deadlines", "It can't change once Week 1 is over"], "why": "See the Notice of Content Change in the syllabus."}
+];
+
+/* =========================================================
+   GAME ENGINE: no edits needed below this line
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const SEEN_KEY = "ba211z-balance-seen";
+let st = null, current = null;
+
+function loadSeen(){ try { return JSON.parse(localStorage.getItem(SEEN_KEY)) || []; } catch(e){ return []; } }
+function saveSeen(ids){ try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids.slice(-40))); } catch(e){} }
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function esc(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+function money(n){ return n.toLocaleString("en-US"); }
+
+function drawQuestion(cat){
+  const seen = new Set(loadSeen());
+  let pool = QUESTIONS.filter(q => q.cat === cat && !st.used.has(q.id));
+  if (!pool.length) pool = QUESTIONS.filter(q => q.cat === cat);
+  const fresh = pool.filter(q => !seen.has(q.id));
+  return pick(fresh.length ? fresh : pool);
+}
+
+function start(){
+  st = {
+    entries: ENTRIES.map(e => ({ ...e, amount: (4 + Math.floor(Math.random()*37)) * 500, status:"pending", tries:0 })),
+    used: new Set(), log: [], done:false
+  };
+  $("#intro").hidden = true; $("#results").hidden = true; $("#game").hidden = false;
+  render();
+  document.querySelector(".entry .btn").focus();
+}
+
+function balances(){
+  const b = {}; TB_ORDER.forEach(a => b[a] = { dr:0, cr:0 });
+  st.entries.forEach(e => {
+    if (e.status === "posted" || e.status === "open" || e.status === "failed") b[e.dr].dr += e.amount;
+    if (e.status === "posted") b[e.cr].cr += e.amount;
+  });
+  return b;
+}
+
+function render(){
+  // Journal
+  const j = $("#journal"); j.innerHTML = "";
+  st.entries.forEach((e,i) => {
+    const drOn = e.status !== "pending", crOn = e.status === "posted";
+    const crCell = crOn ? money(e.amount) : (e.status === "pending" ? "" : "MISSING");
+    const card = document.createElement("article");
+    card.className = "entry " + e.status;
+    let foot = "";
+    if (e.status === "pending") foot = `<button class="btn small" data-i="${i}">Post this entry</button>`;
+    else if (e.status === "posted") foot = `<span class="tag ok">✓ Posted${e.tries > 1 ? " (after a correcting entry)" : ""}</span>`;
+    else if (e.status === "open") foot = `<span class="tag bad">Out of balance by ${money(e.amount)}</span><button class="btn small warn" data-i="${i}">Post correcting entry</button>`;
+    else foot = `<span class="tag bad">✗ Credit not posted</span>`;
+    card.innerHTML = `
+      <div class="date">${e.date.split(" ").map(esc).join("<br>")}</div>
+      <div class="top"><span class="desc">${esc(e.desc)}</span><span class="chip">${esc(e.name)}</span></div>
+      <table class="jl" aria-label="Journal entry">
+        <tr><td>${esc(e.dr)}</td><td class="amt ${drOn ? "" : "blank"}">${drOn ? money(e.amount) : "—"}</td><td class="amt"></td></tr>
+        <tr class="cr"><td>${esc(e.cr)}</td><td class="amt"></td><td class="amt ${crOn ? "" : (e.status === "pending" ? "blank" : "miss")}">${crCell || "—"}</td></tr>
+      </table>
+      <div class="foot">${foot}</div>`;
+    j.appendChild(card);
+  });
+  j.querySelectorAll("button[data-i]").forEach(b => b.addEventListener("click", () => ask(+b.dataset.i)));
+
+  // Trial balance
+  const b = balances(); let tdr = 0, tcr = 0;
+  $("#tbBody").innerHTML = TB_ORDER.map(a => { tdr += b[a].dr; tcr += b[a].cr;
+    return `<tr><td>${esc(a)}</td><td class="n">${b[a].dr ? money(b[a].dr) : ""}</td><td class="n">${b[a].cr ? money(b[a].cr) : ""}</td></tr>`; }).join("") +
+    `<tr class="tot"><td>Totals</td><td class="n">${money(tdr)}</td><td class="n">${money(tcr)}</td></tr>`;
+  const d = $("#diff");
+  if (tdr === tcr){ d.className = "diff ok"; d.innerHTML = tdr ? "In balance: total debits equal total credits." : "Nothing posted yet."; }
+  else { d.className = "diff bad"; d.innerHTML = `Out of balance by <span class="n">${money(tdr - tcr)}</span>`; }
+
+  const posted = st.entries.filter(e => e.status === "posted").length;
+  const open = st.entries.filter(e => e.status === "open").length;
+  $("#status").textContent = `${posted} of 5 entries posted` + (open ? ` · ${open} need${open===1?"s":""} a correcting entry` : "");
+}
+
+function ask(i){
+  const e = st.entries[i], q = drawQuestion(e.cat);
+  st.used.add(q.id); const seen = loadSeen(); seen.push(q.id); saveSeen(seen);
+  current = { e, q };
+  $("#qMeta").textContent = `${e.date} · ${e.desc} · ${e.status === "open" ? "Correcting entry" : e.name}`;
+  $("#qText").textContent = q.q;
+  const opts = $("#qOpts"); opts.innerHTML = "";
+  shuffle([q.a, ...q.wrong]).forEach(t => {
+    const o = document.createElement("button"); o.className = "opt"; o.textContent = t;
+    o.addEventListener("click", () => answer(t, o)); opts.appendChild(o);
+  });
+  $("#qFb").hidden = true; $("#qActions").hidden = true; $("#overlay").hidden = false;
+  opts.firstChild.focus();
+}
+
+function answer(t, btn){
+  const { e, q } = current, ok = t === q.a, wasOpen = e.status === "open";
+  document.querySelectorAll(".opt").forEach(o => { o.disabled = true; if (o.textContent === q.a) o.classList.add("correct"); });
+  if (!ok) btn.classList.add("incorrect");
+  e.tries += 1;
+  st.log.push({ name: e.name, q: q.q, a: q.a, ok });
+  const fb = $("#qFb");
+  if (ok){
+    e.status = "posted";
+    fb.className = "fb ok";
+    fb.innerHTML = `<strong>Posted. ${wasOpen ? "The correcting entry balances it." : "Debit and credit both recorded."}</strong>Dr ${esc(e.dr)} ${money(e.amount)} / Cr ${esc(e.cr)} ${money(e.amount)}. ${esc(q.why)}`;
+  } else {
+    const canFix = e.tries <= CONFIG.correctionsAllowed;
+    e.status = canFix ? "open" : "failed";
+    fb.className = "fb bad";
+    fb.innerHTML = `<strong>${wasOpen ? "The correcting entry didn't post." : "Only the debit posted."} Your books are out of balance by ${money(e.amount)}.</strong>The correct answer is: ${esc(q.a)}. ${esc(q.why)}` +
+      (canFix ? `<br><em>You can post one correcting entry for this transaction.</em>` : "");
+  }
+  fb.hidden = false; $("#qActions").hidden = false;
+  render();
+  const left = st.entries.some(x => x.status === "pending" || x.status === "open");
+  $("#continueBtn").textContent = left ? "Back to the journal" : "Close the books";
+  $("#continueBtn").focus();
+}
+
+function closeCard(){
+  $("#overlay").hidden = true;
+  if (!st.entries.some(x => x.status === "pending" || x.status === "open")) return finish();
+  const next = document.querySelector(".entry .btn"); if (next) next.focus();
+}
+
+function finish(){
+  st.done = true;
+  const won = st.entries.every(e => e.status === "posted");
+  const clean = st.entries.filter(e => e.status === "posted" && e.tries === 1).length;
+  const fixed = st.entries.filter(e => e.status === "posted" && e.tries > 1).length;
+  const b = balances(); const diff = TB_ORDER.reduce((s,a) => s + b[a].dr - b[a].cr, 0);
+  const name = $("#studentName").value.trim() || "Student";
+  const review = st.log.map(x => `<li class="${x.ok ? "" : "miss"}"><div class="q">${x.ok ? "✓" : "✗"} ${esc(x.name)}: ${esc(x.q)}</div><div class="a">Answer: ${esc(x.a)}</div></li>`).join("");
+  $("#results").innerHTML = `
+    <span class="stamp ${won ? "ok" : "bad"}">${won ? "BOOKS CLOSED ✓" : "OUT OF BALANCE"}</span>
+    <h2>${won ? "Your trial balance balances." : `Your books are out of balance by ${money(diff)}.`}</h2>
+    <p>${won
+      ? `You posted all five entries: ${clean} on the first try${fixed ? ` and ${fixed} with a correcting entry` : ""}.`
+      : `At least one entry is missing its credit. Each round draws new questions, so review the syllabus and try again.`}</p>
+    ${won ? `<div class="cert">
+        <div>Certificate of Completion · BA211Z Syllabus Quiz Game</div>
+        <div class="name">${esc(name)}</div>
+        <div>${clean} of 5 entries posted on the first try · ${esc(new Date().toLocaleString())}</div>
+        <div style="margin-top:12px">Completion code</div>
+        <div class="code">${esc(CONFIG.completionCode)}</div>
+        <small>Enter this code in the Canvas Syllabus Quiz, or submit a screenshot of this certificate.</small>
+      </div>` : ""}
+    <h2 style="font-size:1.2rem;margin-top:18px">Review your answers</h2>
+    <ul class="review">${review}</ul>
+    <p style="margin-top:20px"><button class="btn" id="againBtn">${won ? "Play again" : "Try again"}</button></p>`;
+  $("#game").hidden = true; $("#results").hidden = false;
+  $("#againBtn").addEventListener("click", start);
+  $("#results").scrollIntoView({ behavior:"smooth" });
+}
+
+$("#startBtn").addEventListener("click", start);
+$("#continueBtn").addEventListener("click", closeCard);
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !$("#overlay").hidden && !$("#qActions").hidden) closeCard();
+});
+</script>
+</body>
+</html>
